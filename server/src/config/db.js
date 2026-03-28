@@ -141,6 +141,7 @@ await client.query(`
   );
 `)
 
+
     await client.query("COMMIT");
     console.log("✅ TimescaleDB schema ready");
   } catch (err) {
