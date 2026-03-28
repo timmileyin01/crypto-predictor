@@ -6,27 +6,13 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional
 import numpy as np
-import psycopg2
-import pickle
-import io
-import tempfile
-from dotenv import load_dotenv
-
-load_dotenv()
 
 app = FastAPI(title='Crypto LSTM Predictor', version='1.0.0')
 
 predictors = {}
+MODELS_DIR = "./models"
+os.makedirs(MODELS_DIR, exist_ok=True)
 
-def get_db():
-    return psycopg2.connect(
-        host=os.getenv('DB_HOST'),
-        port=os.getenv('DB_PORT'),
-        dbname=os.getenv('DB_NAME'),
-        user=os.getenv('DB_USER'),
-        password=os.getenv('DB_PASSWORD'),
-        sslmode='require',
-    )
 
 class TrainRequest(BaseModel):
     symbol: str
@@ -36,9 +22,11 @@ class TrainRequest(BaseModel):
 
     model_config = {'protected_namespaces': ()}
 
+
 class PredictRequest(BaseModel):
     symbol: str
     prices: List[float]
+
 
 class TrainResponse(BaseModel):
     symbol: str
@@ -50,6 +38,7 @@ class TrainResponse(BaseModel):
 
     model_config = {'protected_namespaces': ()}
 
+
 class PredictResponse(BaseModel):
     symbol: str
     predicted_close: float
@@ -57,99 +46,27 @@ class PredictResponse(BaseModel):
 
     model_config = {'protected_namespaces': ()}
 
-def save_model_to_db(symbol: str, predictor):
-    """Save trained model to TimescaleDB as binary."""
-    from model import LSTMPredictor
-    import tensorflow as tf
-
-    # Save keras model to bytes
-    with tempfile.NamedTemporaryFile(suffix='.keras', delete=False) as f:
-        tmp_path = f.name
-    predictor.model.save(tmp_path)
-    with open(tmp_path, 'rb') as f:
-        model_bytes = f.read()
-    os.unlink(tmp_path)
-
-    # Save scaler to bytes
-    scaler_bytes = pickle.dumps({
-        'scaler': predictor.scaler,
-        'lookback': predictor.lookback,
-        'version': predictor.version,
-    })
-
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute(
-        """
-        INSERT INTO trained_models (symbol, model_data, scaler_data, lookback, version)
-        VALUES (%s, %s, %s, %s, %s)
-        ON CONFLICT (symbol) DO UPDATE
-          SET model_data=EXCLUDED.model_data,
-              scaler_data=EXCLUDED.scaler_data,
-              lookback=EXCLUDED.lookback,
-              version=EXCLUDED.version,
-              created_at=NOW()
-        """,
-        (symbol, psycopg2.Binary(model_bytes), psycopg2.Binary(scaler_bytes),
-         predictor.lookback, predictor.version)
-    )
-    conn.commit()
-    cur.close()
-    conn.close()
-    print(f'[DB] Model saved for {symbol}')
-
-def load_model_from_db(symbol: str):
-    """Load trained model from TimescaleDB."""
-    from model import LSTMPredictor
-    import tensorflow as tf
-
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute(
-        'SELECT model_data, scaler_data, lookback, version FROM trained_models WHERE symbol = %s',
-        (symbol,)
-    )
-    row = cur.fetchone()
-    cur.close()
-    conn.close()
-
-    if not row:
-        raise HTTPException(
-            status_code=404,
-            detail=f'No trained model found for {symbol}. POST /train first.'
-        )
-
-    model_bytes, scaler_bytes, lookback, version = row
-
-    # Restore keras model from bytes
-    with tempfile.NamedTemporaryFile(suffix='.keras', delete=False) as f:
-        f.write(bytes(model_bytes))
-        tmp_path = f.name
-
-    from tensorflow.keras.models import load_model
-    keras_model = load_model(tmp_path)
-    os.unlink(tmp_path)
-
-    # Restore scaler
-    scaler_data = pickle.loads(bytes(scaler_bytes))
-
-    predictor = LSTMPredictor(symbol, lookback=lookback)
-    predictor.model = keras_model
-    predictor.scaler = scaler_data['scaler']
-    predictor.version = scaler_data['version']
-
-    return predictor
 
 def get_or_load(symbol: str):
     if symbol in predictors:
         return predictors[symbol]
-    predictor = load_model_from_db(symbol)
-    predictors[symbol] = predictor
-    return predictor
+    from model import LSTMPredictor
+    model_path = os.path.join(MODELS_DIR, f'{symbol}.keras')
+    if os.path.exists(model_path):
+        p = LSTMPredictor(symbol)
+        p.load(model_path)
+        predictors[symbol] = p
+        return p
+    raise HTTPException(
+        status_code=404,
+        detail=f'No trained model found for {symbol}. POST /train first.'
+    )
+
 
 @app.get("/health")
 def health():
     return {'status': 'ok', 'loaded_models': list(predictors.keys())}
+
 
 @app.post('/train', response_model=TrainResponse)
 def train(req: TrainRequest):
@@ -168,8 +85,8 @@ def train(req: TrainRequest):
         epochs=req.epochs,
     )
 
-    # Save to database instead of disk
-    save_model_to_db(symbol, predictor)
+    model_path = os.path.join(MODELS_DIR, f'{symbol}.keras')
+    predictor.save(model_path)
     predictors[symbol] = predictor
 
     return TrainResponse(
@@ -180,6 +97,7 @@ def train(req: TrainRequest):
         final_loss=result['final_loss'],
         model_version=predictor.version,
     )
+
 
 @app.post('/predict', response_model=PredictResponse)
 def predict(req: PredictRequest):
@@ -199,6 +117,7 @@ def predict(req: PredictRequest):
         predicted_close=round(float(predicted), 4),
         model_version=predictor.version,
     )
+
 
 if __name__ == "__main__":
     import uvicorn
