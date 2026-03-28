@@ -29,7 +29,7 @@ app.use('/api/auth', authRoutes)
 app.use('/api/watchlist', watchlistRoutes)
 app.use('/api/alerts', alertsRoutes)
 
-app.get('/health', (_, res) => res.json({ status: 'ok' }))
+app.all('/health', (req, res) => res.json({ status: 'ok' }))
 
 async function bootstrap() {
   await initDB()
