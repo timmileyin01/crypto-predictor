@@ -1,0 +1,18 @@
+# Server
+server/node_modules
+server/.env
+server/data
+
+# ML
+ml/venv
+ml/models
+ml/__pycache__
+ml/*.pyc
+
+# Client
+client/node_modules
+client/dist
+
+# General
+.DS_Store
+*.log
