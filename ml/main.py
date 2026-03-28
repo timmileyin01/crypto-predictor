@@ -1,19 +1,16 @@
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
+
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional
 import numpy as np
-import os
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-import tensorflow as tf
-tf.get_logger().setLevel('ERROR')
-
-from model import LSTMPredictor
 
 app = FastAPI(title='Crypto LSTM Predictor', version='1.0.0')
 
 predictors = {}
-
-MODELS_DIR = './models'
+MODELS_DIR = "./models"
 os.makedirs(MODELS_DIR, exist_ok=True)
 
 
@@ -48,9 +45,10 @@ class PredictResponse(BaseModel):
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def get_or_load(symbol: str) -> LSTMPredictor:
+def get_or_load(symbol: str):
     if symbol in predictors:
         return predictors[symbol]
+    from model import LSTMPredictor
     model_path = os.path.join(MODELS_DIR, f'{symbol}.keras')
     if os.path.exists(model_path):
         p = LSTMPredictor(symbol)
@@ -65,13 +63,17 @@ def get_or_load(symbol: str) -> LSTMPredictor:
 
 # ── Routes ────────────────────────────────────────────────────────────────────
 
-@app.get('/health')
+@app.get("/health")
 def health():
-    return {'status': 'ok', 'loaded_models': list(predictors.keys())}
+    return {
+        'status': 'ok',
+        'loaded_models': list(predictors.keys())
+    }
 
 
 @app.post('/train', response_model=TrainResponse)
 def train(req: TrainRequest):
+    from model import LSTMPredictor
     symbol = req.symbol.upper()
 
     if len(req.prices) < req.lookback + 1:
@@ -118,7 +120,6 @@ def predict(req: PredictRequest):
         predicted_close=round(float(predicted), 4),
         model_version=predictor.version,
     )
-
 
 
 if __name__ == "__main__":
