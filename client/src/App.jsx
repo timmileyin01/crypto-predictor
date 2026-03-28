@@ -73,6 +73,12 @@ export default function App() {
     toast(`✅ ${newSymbol} added — train the model to get predictions`);
   }
 
+  function handleSymbolDeleted(deletedSymbol) {
+    setAllSymbols((prev) => prev.filter((s) => s !== deletedSymbol));
+    if (symbol === deletedSymbol) setSymbol("BTCUSDT");
+    toast(`✅ ${deletedSymbol} removed`);
+  }
+
   const loadHistory = useCallback(async () => {
     setLoad("history", true);
     try {
@@ -504,6 +510,7 @@ export default function App() {
       {showAddSymbol && (
         <AddSymbol
           onAdded={handleSymbolAdded}
+          onDeleted={handleSymbolDeleted}
           onClose={() => setShowAddSymbol(false)}
         />
       )}

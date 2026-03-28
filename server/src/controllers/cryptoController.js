@@ -331,3 +331,29 @@ export async function addSymbol(req, res) {
     res.status(500).json({ success: false, error: err.message })
   }
 }
+
+
+export async function deleteSymbol(req, res) {
+  const { symbol } = req.params
+
+  const defaultSymbols = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT']
+  if (defaultSymbols.includes(symbol.toUpperCase())) {
+    return res.status(400).json({
+      success: false,
+      error: `${symbol} is a default symbol and cannot be deleted`,
+    })
+  }
+
+  try {
+    await pool.query('DELETE FROM watchlists WHERE symbol = $1', [symbol.toUpperCase()])
+    await pool.query('DELETE FROM predictions WHERE symbol = $1', [symbol.toUpperCase()])
+    await pool.query('DELETE FROM alerts WHERE symbol = $1', [symbol.toUpperCase()])
+    await pool.query('DELETE FROM ohlcv WHERE symbol = $1', [symbol.toUpperCase()])
+    await pool.query('DELETE FROM coin_map WHERE symbol = $1', [symbol.toUpperCase()])
+    await pool.query('DELETE FROM symbols WHERE symbol = $1', [symbol.toUpperCase()])
+
+    res.json({ success: true, message: `${symbol} deleted successfully` })
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message })
+  }
+}

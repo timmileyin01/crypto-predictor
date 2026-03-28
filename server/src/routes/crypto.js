@@ -10,6 +10,7 @@ import {
   clearPredictions,
   searchSymbols,
   addSymbol,
+  deleteSymbol,
 } from '../controllers/cryptoController.js'
 import { runDailyJob } from '../config/scheduler.js'
 
@@ -34,5 +35,7 @@ router.post('/run-daily-job', async (req, res) => {
     res.status(500).json({ success: false, error: err.message })
   }
 })
+
+router.delete('/symbols/:symbol', deleteSymbol)
 
 export default router

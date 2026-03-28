@@ -39,6 +39,7 @@ export const symbolsApi = {
   search: (q) => api.get(`/crypto/search?q=${encodeURIComponent(q)}`),
   add: (symbol, coinId, name) => api.post('/crypto/symbols', { symbol, coinId, name }),
   getAll: () => api.get('/crypto/symbols'),
+  delete: (symbol) => api.delete(`/crypto/symbols/${symbol}`),
 }
 
 export const alertsApi = {
