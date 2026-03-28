@@ -294,14 +294,16 @@ export default function App() {
                   <RefreshCw size={14} />
                   {loading.history ? "Loading..." : "Refresh"}
                 </button>
-                <button
-                  className="btn btn-primary"
-                  onClick={handleTrain}
-                  disabled={loading.train}
-                >
-                  <Brain size={14} />
-                  {loading.train ? "Training..." : "Train Model"}
-                </button>
+                {user?.is_admin && (
+                  <button
+                    className="btn btn-primary"
+                    onClick={handleTrain}
+                    disabled={loading.train}
+                  >
+                    <Brain size={14} />
+                    {loading.train ? "Training..." : "Train Model"}
+                  </button>
+                )}
               </div>
             </div>
 

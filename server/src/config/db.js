@@ -142,6 +142,15 @@ await client.query(`
 `)
 
 
+await client.query(`
+  ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN DEFAULT FALSE;
+`)
+
+// Make your account admin
+await client.query(`
+  UPDATE users SET is_admin = TRUE WHERE email = 'oluwasseyitimm03@gmail.com';
+`)
+
     await client.query("COMMIT");
     console.log("✅ TimescaleDB schema ready");
   } catch (err) {
