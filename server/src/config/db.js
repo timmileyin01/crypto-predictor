@@ -129,6 +129,18 @@ await client.query(`
   );
 `)
 
+// Stores trained LSTM models as binary blobs
+await client.query(`
+  CREATE TABLE IF NOT EXISTS trained_models (
+    symbol       TEXT PRIMARY KEY,
+    model_data   BYTEA NOT NULL,
+    scaler_data  BYTEA NOT NULL,
+    lookback     INTEGER NOT NULL,
+    version      TEXT NOT NULL,
+    created_at   TIMESTAMPTZ DEFAULT NOW()
+  );
+`)
+
     await client.query("COMMIT");
     console.log("✅ TimescaleDB schema ready");
   } catch (err) {
