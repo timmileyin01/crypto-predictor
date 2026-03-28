@@ -4,7 +4,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 const transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
+  host: "smtp.gmail.com",
   port: 587,
   secure: false,
   family: 4, // Force IPv4
@@ -43,8 +43,8 @@ export async function sendAlertEmail({
 
       <div style="background: #1e1b4b; border: 1px solid rgba(99,102,241,0.3); border-radius: 8px; padding: 20px; margin-bottom: 20px;">
         <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
-          <span style="color: #94a3b8; font-size: 13px;">Predicted close</span>
-          <strong style="color: #34d399; font-size: 18px;">$${predictedClose.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 4 })}</strong>
+        <span style="color: #94a3b8; font-size: 13px;">${isLive ? "Live price" : "Predicted close"}</span>
+        <strong style="color: #34d399; font-size: 18px;">$${predictedClose.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 4 })}</strong>
         </div>
         <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
           <span style="color: #94a3b8; font-size: 13px;">Your threshold</span>
@@ -52,11 +52,11 @@ export async function sendAlertEmail({
         </div>
         <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
           <span style="color: #94a3b8; font-size: 13px;">Condition</span>
-          <strong style="color: #f1f5f9;">Predicted ${direction} threshold</strong>
+          <strong style="color: #f1f5f9;">${condition === "above" ? "Above" : "Below"} threshold</strong>
         </div>
         <div style="display: flex; justify-content: space-between;">
-          <span style="color: #94a3b8; font-size: 13px;">Prediction for</span>
-          <strong style="color: #f1f5f9;">${predictedFor}</strong>
+          <span style="color: #94a3b8; font-size: 13px;">Alert type</span>
+          <strong style="color: #f1f5f9;">${isLive ? "Live price alert" : "Prediction alert"}</strong>
         </div>
       </div>
 
