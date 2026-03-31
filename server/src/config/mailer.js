@@ -4,15 +4,18 @@ import dotenv from "dotenv";
 dotenv.config();
 
 const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
+  host: 'smtp.gmail.com',
   port: 587,
   secure: false,
-  family: 4, // Force IPv4
+  family: 4,
+  tls: {
+    rejectUnauthorized: false,
+  },
   auth: {
     user: process.env.GMAIL_USER,
     pass: process.env.GMAIL_APP_PASSWORD,
   },
-});
+})
 
 export async function sendAlertEmail({
   to,

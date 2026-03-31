@@ -13,7 +13,10 @@ dotenv.config()
 const ML_URL = process.env.ML_SERVICE_URL || 'http://localhost:8000'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const FETCH_SCRIPT = path.join(__dirname, '../../../ml/fetch_data.py')
-const PYTHON = path.join(__dirname, '../../../ml/venv/Scripts/python.exe')
+const IS_WINDOWS = process.platform === 'win32'
+const PYTHON = IS_WINDOWS
+  ? path.join(__dirname, '../../../ml/venv/Scripts/python.exe')
+  : path.join(__dirname, '../../../ml/venv/bin/python')
 
 function runPythonFetch() {
   return new Promise((resolve, reject) => {
