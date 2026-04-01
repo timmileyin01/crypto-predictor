@@ -16,14 +16,17 @@ DEFAULT_MAP = {
 }
 
 def get_db():
-    return psycopg2.connect(
-        host=os.getenv('DB_HOST'),
-        port=os.getenv('DB_PORT'),
-        dbname=os.getenv('DB_NAME'),
-        user=os.getenv('DB_USER'),
-        password=os.getenv('DB_PASSWORD'),
-        sslmode='require',
-    )
+    is_production = os.getenv('NODE_ENV') == 'production'
+    conn_args = {
+        'host': os.getenv('DB_HOST'),
+        'port': os.getenv('DB_PORT'),
+        'dbname': os.getenv('DB_NAME'),
+        'user': os.getenv('DB_USER'),
+        'password': os.getenv('DB_PASSWORD'),
+    }
+    if is_production:
+        conn_args['sslmode'] = 'require'
+    return psycopg2.connect(**conn_args)
 
 def get_symbol_map():
     """Load symbol -> yfinance ticker mapping from coin_map table."""
