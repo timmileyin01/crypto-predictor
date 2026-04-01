@@ -33,6 +33,11 @@ class LSTMPredictor:
             Dense(1),
         ])
         model.compile(optimizer='adam', loss='mean_squared_error')
+
+        # Reduce retracing by running a warmup prediction
+        dummy = np.zeros((1, self.lookback, 1), dtype=np.float32)
+        model(dummy, training=False)
+
         return model
 
     def train(self, prices: np.ndarray, epochs: int = 50, batch_size: int = 32):
@@ -77,20 +82,18 @@ class LSTMPredictor:
         if self.model is None:
             raise RuntimeError('Model not trained or loaded.')
 
-        # Use the last `lookback` prices
         window = prices[-self.lookback:].reshape(-1, 1)
-
-        # Scale using the scaler fitted on full training data
         scaled = self.scaler.transform(window)
         scaled = np.clip(scaled, 0, 1)
 
-        X = scaled.reshape(1, self.lookback, 1)
-        pred_scaled = self.model.predict(X, verbose=0)
+        # Fix input shape explicitly to prevent TensorFlow retracing
+        X = np.zeros((1, self.lookback, 1), dtype=np.float32)
+        X[0] = scaled.reshape(self.lookback, 1)
 
-        # Inverse transform to get real price
-        predicted = self.scaler.inverse_transform(pred_scaled)
+        pred_scaled = self.model(X, training=False)
+        predicted = self.scaler.inverse_transform(pred_scaled.numpy())
         return float(predicted[0, 0])
-
+    
     def save(self, model_path: str):
         self.model.save(model_path)
         scaler_path = model_path.replace('.keras', '_scaler.pkl')
