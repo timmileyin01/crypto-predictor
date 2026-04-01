@@ -1,85 +1,45 @@
 import cron from 'node-cron'
 import { pool } from './db.js'
 import axios from 'axios'
-import yahooFinance from 'yahoo-finance2'
+import { exec } from 'child_process'
+import path from 'path'
+import { fileURLToPath } from 'url'
 import dotenv from 'dotenv'
 
 dotenv.config()
 
 const ML_URL = process.env.ML_SERVICE_URL || 'http://localhost:8000'
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
-const SYMBOL_MAP = {
-  BTCUSDT:  'BTC-USD',
-  ETHUSDT:  'ETH-USD',
-  SOLUSDT:  'SOL-USD',
-  BNBUSDT:  'BNB-USD',
-  DOGEUSDT: 'DOGE-USD',
-  ADAUSDT:  'ADA-USD',
-}
+const IS_WINDOWS = process.platform === 'win32'
+const PYTHON = IS_WINDOWS ? 'python' : 'python3'
+const FETCH_SCRIPT = path.join(__dirname, '../../../ml/fetch_data.py')
 
-async function getYFSymbol(symbol) {
-  // Check coin_map for dynamic symbols
-  const base = symbol.replace('USDT', '')
-  return SYMBOL_MAP[symbol] || `${base}-USD`
-}
-
-export async function fetchLatestPrices() {
-  const { rows: symbols } = await pool.query('SELECT symbol FROM symbols')
-
-  for (const { symbol } of symbols) {
-    try {
-      const yfSymbol = await getYFSymbol(symbol)
-
-      const result = await yahooFinance.historical(yfSymbol, {
-        period1: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // last 7 days
-        interval: '1d',
-      })
-
-      if (!result || result.length === 0) {
-        console.log(`[Fetch] No data for ${symbol}`)
-        continue
+function runPythonFetch() {
+  return new Promise((resolve, reject) => {
+    exec(`"${PYTHON}" "${FETCH_SCRIPT}" latest`, (error, stdout, stderr) => {
+      if (error) {
+        console.error('[Scheduler] Python fetch error:', stderr)
+        reject(error)
+      } else {
+        console.log('[Scheduler] Python fetch output:', stdout)
+        resolve(stdout)
       }
-
-      for (const candle of result) {
-        await pool.query(
-          `INSERT INTO ohlcv (time, symbol, open, high, low, close, volume)
-           VALUES ($1, $2, $3, $4, $5, $6, $7)
-           ON CONFLICT (time, symbol) DO UPDATE
-             SET open=EXCLUDED.open, high=EXCLUDED.high,
-                 low=EXCLUDED.low, close=EXCLUDED.close,
-                 volume=EXCLUDED.volume`,
-          [
-            candle.date,
-            symbol,
-            candle.open,
-            candle.high,
-            candle.low,
-            candle.close,
-            candle.volume || 0,
-          ]
-        )
-      }
-
-      console.log(`[Fetch] ✅ ${symbol} — updated ${result.length} candles`)
-    } catch (err) {
-      console.error(`[Fetch] ❌ ${symbol}: ${err.message}`)
-    }
-  }
+    })
+  })
 }
 
 async function runDailyJob() {
   console.log('[Scheduler] Running daily fetch + predict job...')
 
-  // 1. Fetch latest prices via yahoo-finance2
   try {
     console.log('[Scheduler] Fetching latest prices from Yahoo Finance...')
-    await fetchLatestPrices()
+    await runPythonFetch()
     console.log('[Scheduler] ✅ Prices updated')
   } catch (err) {
-    console.error('[Scheduler] ⚠️ Price fetch failed:', err.message)
+    console.error('[Scheduler] ⚠️ Price fetch failed, continuing with existing data:', err.message)
   }
 
-  // 2. Generate predictions for all symbols
   const { rows: symbols } = await pool.query('SELECT symbol FROM symbols')
 
   for (const { symbol } of symbols) {
