@@ -100,7 +100,7 @@ def fetch_and_store(symbol, yf_symbol, period='2y'):
     cur.close()
     conn.close()
 
-    print(f'[{symbol}] ✅ Upserted {count} candles')
+    print(f'[{symbol}] OK Upserted {count} candles')
     return count
 
 def fetch_latest(symbol=None):
@@ -111,7 +111,7 @@ def fetch_latest(symbol=None):
         if yf_sym:
             fetch_and_store(s, yf_sym, period='5d')
         else:
-            print(f'⚠️  No Yahoo Finance mapping for {s}')
+            print(f'Warning: No Yahoo Finance mapping for {s}')
 
 def fetch_all_history(symbol=None):
     symbol_map = get_symbol_map()
@@ -121,7 +121,7 @@ def fetch_all_history(symbol=None):
         if yf_sym:
             fetch_and_store(s, yf_sym, period='2y')
         else:
-            print(f'⚠️  No Yahoo Finance mapping for {s}')
+            print(f'Warning: No Yahoo Finance mapping for {s}')
 if __name__ == '__main__':
     mode   = sys.argv[1] if len(sys.argv) > 1 else 'latest'
     symbol = sys.argv[2] if len(sys.argv) > 2 else None
@@ -131,4 +131,4 @@ if __name__ == '__main__':
     else:
         fetch_latest(symbol)
 
-    print('🎉 Done!')
+    print('Done!')
