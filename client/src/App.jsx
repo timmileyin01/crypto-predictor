@@ -21,6 +21,7 @@ import Accuracy from "./Accuracy";
 import AddSymbol from "./AddSymbol";
 import { symbolsApi } from "./api";
 import Alerts from "./Alerts";
+import PredictionHistory from "./PredictionHistory";
 
 const SYMBOLS = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT"];
 
@@ -51,6 +52,7 @@ export default function App() {
   const [ticker, setTicker] = useState(null);
   const [showAddSymbol, setShowAddSymbol] = useState(false);
   const [allSymbols, setAllSymbols] = useState(SYMBOLS);
+  const [activeTab, setActiveTab] = useState("dashboard");
   const watchlistRef = useRef(null);
 
   const setLoad = (key, val) => setLoading((l) => ({ ...l, [key]: val }));
@@ -269,246 +271,272 @@ export default function App() {
         </div>
       )}
 
-      <main className="main">
-        <div className="dashboard">
-          <div className="dashboard-main">
-            {/* Controls */}
-            <div className="controls">
-              <div className="days-tabs">
-                {[30, 60, 90, 180, 365].map((d) => (
-                  <button
-                    key={d}
-                    className={`day-tab ${days === d ? "active" : ""}`}
-                    onClick={() => setDays(d)}
-                  >
-                    {d}d
-                  </button>
-                ))}
-              </div>
-              <div className="action-btns">
-                <button
-                  className="btn btn-secondary"
-                  onClick={loadHistory}
-                  disabled={loading.history}
-                >
-                  <RefreshCw size={14} />
-                  {loading.history ? "Loading..." : "Refresh"}
-                </button>
-                {user?.is_admin && (
-                  <button
-                    className="btn btn-primary"
-                    onClick={handleTrain}
-                    disabled={loading.train}
-                  >
-                    <Brain size={14} />
-                    {loading.train ? "Training..." : "Train Model"}
-                  </button>
-                )}
-              </div>
-            </div>
+      {/* App tabs */}
+      <div className="app-tabs">
+        <button
+          className={`app-tab ${activeTab === "dashboard" ? "active" : ""}`}
+          onClick={() => setActiveTab("dashboard")}
+        >
+          Dashboard
+        </button>
+        <button
+          className={`app-tab ${activeTab === "history" ? "active" : ""}`}
+          onClick={() => setActiveTab("history")}
+        >
+          Prediction History
+        </button>
+      </div>
 
-            {/* Prediction card */}
-            {prediction && (
-              <div className="pred-card">
-                <div className="pred-left">
-                  <div className="pred-label">
-                    Next closing price prediction
-                  </div>
-                  <div className="pred-date">
-                    For{" "}
-                    {new Date(prediction.predicted_for).toLocaleDateString(
-                      "en-CA",
-                    )}
-                  </div>
+      {activeTab === "dashboard" ? (
+        <main className="main">
+          <div className="dashboard">
+            <div className="dashboard-main">
+              {/* Controls */}
+              <div className="controls">
+                <div className="days-tabs">
+                  {[30, 60, 90, 180, 365].map((d) => (
+                    <button
+                      key={d}
+                      className={`day-tab ${days === d ? "active" : ""}`}
+                      onClick={() => setDays(d)}
+                    >
+                      {d}d
+                    </button>
+                  ))}
                 </div>
-                <div className="pred-right">
-                  <div className={`pred-value ${isUp ? "up" : "down"}`}>
-                    ${fmt(predClose)}
-                    {isUp !== null && (
-                      <span className="pred-icon">
-                        {isUp ? (
-                          <TrendingUp size={20} />
-                        ) : (
-                          <TrendingDown size={20} />
-                        )}
-                      </span>
-                    )}
-                  </div>
-                  {lastClose && (
-                    <div className="pred-vs">
-                      vs last close ${fmt(lastClose)}
-                    </div>
+                <div className="action-btns">
+                  <button
+                    className="btn btn-secondary"
+                    onClick={loadHistory}
+                    disabled={loading.history}
+                  >
+                    <RefreshCw size={14} />
+                    {loading.history ? "Loading..." : "Refresh"}
+                  </button>
+                  {user?.is_admin && (
+                    <button
+                      className="btn btn-primary"
+                      onClick={handleTrain}
+                      disabled={loading.train}
+                    >
+                      <Brain size={14} />
+                      {loading.train ? "Training..." : "Train Model"}
+                    </button>
                   )}
                 </div>
               </div>
-            )}
 
-            {/* Price chart */}
-            <section className="chart-card">
-              <h2 className="chart-title">
-                {symbol.replace("USDT", "/USDT")} — Closing price ({days}d)
-              </h2>
-              {loading.history ? (
-                <div className="chart-placeholder">Loading...</div>
-              ) : history.length === 0 ? (
-                <div className="chart-placeholder">No data available.</div>
-              ) : (
-                <ResponsiveContainer width="100%" height={300}>
-                  <AreaChart
-                    data={history}
-                    margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
-                  >
-                    <defs>
-                      <linearGradient id="grad" x1="0" y1="0" x2="0" y2="1">
-                        <stop
-                          offset="5%"
-                          stopColor="#6366f1"
-                          stopOpacity={0.3}
-                        />
-                        <stop
-                          offset="95%"
-                          stopColor="#6366f1"
-                          stopOpacity={0}
-                        />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      stroke="rgba(255,255,255,.06)"
-                    />
-                    <XAxis
-                      dataKey="date"
-                      tick={{ fontSize: 11, fill: "#94a3b8" }}
-                      tickLine={false}
-                      interval="preserveStartEnd"
-                    />
-                    <YAxis
-                      tick={{ fontSize: 11, fill: "#94a3b8" }}
-                      tickLine={false}
-                      axisLine={false}
-                      tickFormatter={(v) => {
-                        if (v >= 1000) return "$" + (v / 1000).toFixed(1) + "k";
-                        if (v >= 1) return "$" + v.toFixed(2);
-                        return "$" + v.toFixed(4);
-                      }}
-                      width={64}
-                    />
-                    <Tooltip
-                      contentStyle={{
-                        background: "#1e293b",
-                        border: "1px solid #334155",
-                        borderRadius: 8,
-                      }}
-                      labelStyle={{ color: "#94a3b8", fontSize: 12 }}
-                      formatter={(v) => ["$" + fmt(v), "Close"]}
-                    />
-                    {prediction && (
-                      <ReferenceLine
-                        y={prediction.predicted_close}
-                        stroke="#818cf8"
-                        strokeDasharray="5 5"
-                        label={{
-                          value: "Predicted",
-                          fill: "#818cf8",
-                          fontSize: 11,
-                          position: "insideTopRight",
-                        }}
-                      />
+              {/* Prediction card */}
+              {prediction && (
+                <div className="pred-card">
+                  <div className="pred-left">
+                    <div className="pred-label">
+                      Next closing price prediction
+                    </div>
+                    <div className="pred-date">
+                      For{" "}
+                      {new Date(prediction.predicted_for).toLocaleDateString(
+                        "en-CA",
+                      )}
+                    </div>
+                  </div>
+                  <div className="pred-right">
+                    <div className={`pred-value ${isUp ? "up" : "down"}`}>
+                      ${fmt(predClose)}
+                      {isUp !== null && (
+                        <span className="pred-icon">
+                          {isUp ? (
+                            <TrendingUp size={20} />
+                          ) : (
+                            <TrendingDown size={20} />
+                          )}
+                        </span>
+                      )}
+                    </div>
+                    {lastClose && (
+                      <div className="pred-vs">
+                        vs last close ${fmt(lastClose)}
+                      </div>
                     )}
-                    <Area
-                      type="monotone"
-                      dataKey="close"
-                      stroke="#6366f1"
-                      strokeWidth={2}
-                      fill="url(#grad)"
-                      dot={false}
-                      activeDot={{ r: 4, fill: "#6366f1" }}
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
+                  </div>
+                </div>
               )}
-            </section>
 
-            {/* Prediction vs Actual chart */}
-            {predHistory.length > 1 && (
+              {/* Price chart */}
               <section className="chart-card">
-                <h2 className="chart-title">Predicted vs Actual</h2>
-                <ResponsiveContainer width="100%" height={220}>
-                  <LineChart
-                    data={predHistory}
-                    margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
-                  >
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      stroke="rgba(255,255,255,.06)"
-                    />
-                    <XAxis
-                      dataKey="date"
-                      tick={{ fontSize: 11, fill: "#94a3b8" }}
-                      tickLine={false}
-                      interval="preserveStartEnd"
-                    />
-                    <YAxis
-                      tick={{ fontSize: 11, fill: "#94a3b8" }}
-                      tickLine={false}
-                      axisLine={false}
-                      tickFormatter={(v) => {
-                        if (v >= 1000) return "$" + (v / 1000).toFixed(1) + "k";
-                        if (v >= 1) return "$" + v.toFixed(2);
-                        return "$" + v.toFixed(4);
-                      }}
-                      width={64}
-                    />
-                    <Tooltip
-                      contentStyle={{
-                        background: "#1e293b",
-                        border: "1px solid #334155",
-                        borderRadius: 8,
-                      }}
-                      labelStyle={{ color: "#94a3b8", fontSize: 12 }}
-                      formatter={(v, name) => [
-                        "$" + fmt(v),
-                        name === "predicted" ? "Predicted" : "Actual",
-                      ]}
-                    />
-                    <Legend wrapperStyle={{ fontSize: 12, color: "#94a3b8" }} />
-                    <Line
-                      type="monotone"
-                      dataKey="predicted"
-                      stroke="#818cf8"
-                      strokeWidth={2}
-                      dot={false}
-                      name="predicted"
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="actual"
-                      stroke="#34d399"
-                      strokeWidth={2}
-                      dot={{ r: 3 }}
-                      name="actual"
-                      connectNulls={false}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
+                <h2 className="chart-title">
+                  {symbol.replace("USDT", "/USDT")} — Closing price ({days}d)
+                </h2>
+                {loading.history ? (
+                  <div className="chart-placeholder">Loading...</div>
+                ) : history.length === 0 ? (
+                  <div className="chart-placeholder">No data available.</div>
+                ) : (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <AreaChart
+                      data={history}
+                      margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
+                    >
+                      <defs>
+                        <linearGradient id="grad" x1="0" y1="0" x2="0" y2="1">
+                          <stop
+                            offset="5%"
+                            stopColor="#6366f1"
+                            stopOpacity={0.3}
+                          />
+                          <stop
+                            offset="95%"
+                            stopColor="#6366f1"
+                            stopOpacity={0}
+                          />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        stroke="rgba(255,255,255,.06)"
+                      />
+                      <XAxis
+                        dataKey="date"
+                        tick={{ fontSize: 11, fill: "#94a3b8" }}
+                        tickLine={false}
+                        interval="preserveStartEnd"
+                      />
+                      <YAxis
+                        tick={{ fontSize: 11, fill: "#94a3b8" }}
+                        tickLine={false}
+                        axisLine={false}
+                        tickFormatter={(v) => {
+                          if (v >= 1000)
+                            return "$" + (v / 1000).toFixed(1) + "k";
+                          if (v >= 1) return "$" + v.toFixed(2);
+                          return "$" + v.toFixed(4);
+                        }}
+                        width={64}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          background: "#1e293b",
+                          border: "1px solid #334155",
+                          borderRadius: 8,
+                        }}
+                        labelStyle={{ color: "#94a3b8", fontSize: 12 }}
+                        formatter={(v) => ["$" + fmt(v), "Close"]}
+                      />
+                      {prediction && (
+                        <ReferenceLine
+                          y={prediction.predicted_close}
+                          stroke="#818cf8"
+                          strokeDasharray="5 5"
+                          label={{
+                            value: "Predicted",
+                            fill: "#818cf8",
+                            fontSize: 11,
+                            position: "insideTopRight",
+                          }}
+                        />
+                      )}
+                      <Area
+                        type="monotone"
+                        dataKey="close"
+                        stroke="#6366f1"
+                        strokeWidth={2}
+                        fill="url(#grad)"
+                        dot={false}
+                        activeDot={{ r: 4, fill: "#6366f1" }}
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                )}
               </section>
-            )}
-          </div>
 
-          {/* Sidebar */}
-          <div className="dashboard-sidebar">
-            <Watchlist
-              key={allSymbols.join(",")}
-              onSelectSymbol={(s) => setSymbol(s)}
-            />
-            <div style={{ marginTop: "16px" }}>
-              <Alerts allSymbols={allSymbols} />
+              {/* Prediction vs Actual chart */}
+              {predHistory.length > 1 && (
+                <section className="chart-card">
+                  <h2 className="chart-title">Predicted vs Actual</h2>
+                  <ResponsiveContainer width="100%" height={220}>
+                    <LineChart
+                      data={predHistory}
+                      margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
+                    >
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        stroke="rgba(255,255,255,.06)"
+                      />
+                      <XAxis
+                        dataKey="date"
+                        tick={{ fontSize: 11, fill: "#94a3b8" }}
+                        tickLine={false}
+                        interval="preserveStartEnd"
+                      />
+                      <YAxis
+                        tick={{ fontSize: 11, fill: "#94a3b8" }}
+                        tickLine={false}
+                        axisLine={false}
+                        tickFormatter={(v) => {
+                          if (v >= 1000)
+                            return "$" + (v / 1000).toFixed(1) + "k";
+                          if (v >= 1) return "$" + v.toFixed(2);
+                          return "$" + v.toFixed(4);
+                        }}
+                        width={64}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          background: "#1e293b",
+                          border: "1px solid #334155",
+                          borderRadius: 8,
+                        }}
+                        labelStyle={{ color: "#94a3b8", fontSize: 12 }}
+                        formatter={(v, name) => [
+                          "$" + fmt(v),
+                          name === "predicted" ? "Predicted" : "Actual",
+                        ]}
+                      />
+                      <Legend
+                        wrapperStyle={{ fontSize: 12, color: "#94a3b8" }}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="predicted"
+                        stroke="#818cf8"
+                        strokeWidth={2}
+                        dot={false}
+                        name="predicted"
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="actual"
+                        stroke="#34d399"
+                        strokeWidth={2}
+                        dot={{ r: 3 }}
+                        name="actual"
+                        connectNulls={false}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </section>
+              )}
+            </div>
+
+            {/* Sidebar */}
+            <div className="dashboard-sidebar">
+              <Watchlist
+                key={allSymbols.join(",")}
+                onSelectSymbol={(s) => setSymbol(s)}
+              />
+              <div style={{ marginTop: "16px" }}>
+                <Alerts allSymbols={allSymbols} />
+              </div>
             </div>
           </div>
-        </div>
-        {/* Model accuracy */}
-        <Accuracy symbol={symbol} data={predHistory} />
-      </main>
+          {/* Model accuracy */}
+          <Accuracy symbol={symbol} data={predHistory} />
+        </main>
+      ) : (
+        <main className="main">
+          <PredictionHistory allSymbols={allSymbols} />
+        </main>
+      )}
       {showAddSymbol && (
         <AddSymbol
           onAdded={handleSymbolAdded}

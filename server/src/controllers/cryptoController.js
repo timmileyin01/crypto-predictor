@@ -114,14 +114,18 @@ export async function getPrediction(req, res) {
   const { symbol } = req.params;
 
   try {
-    const now1 = new Date();
-    const today = `${now1.getFullYear()}-${String(now1.getMonth() + 1).padStart(2, "0")}-${String(now1.getDate()).padStart(2, "0")}`;
+    // Always return the most recent prediction without date filtering
     const { rows: cached } = await pool.query(
-      `SELECT * FROM predictions WHERE symbol = $1 AND predicted_for = $2`,
-      [symbol.toUpperCase(), today],
+      `SELECT * FROM predictions 
+   WHERE symbol = $1 
+   ORDER BY predicted_for DESC 
+   LIMIT 1`,
+      [symbol.toUpperCase()],
     );
 
-    if (cached.length > 0) {
+    // Only use cache if prediction is for today or future
+    const today = new Date().toISOString().split("T")[0];
+    if (cached.length > 0 && cached[0].predicted_for >= today) {
       return res.json({ success: true, source: "cache", data: cached[0] });
     }
 
@@ -167,9 +171,12 @@ export async function getPrediction(req, res) {
     );
 
     // Check and fire any matching alerts immediately
-const { checkAndFireAlerts } = await import('./alertsController.js')
-await checkAndFireAlerts(symbol.toUpperCase(), mlResult.predicted_close, predictedFor)
-
+    const { checkAndFireAlerts } = await import("./alertsController.js");
+    await checkAndFireAlerts(
+      symbol.toUpperCase(),
+      mlResult.predicted_close,
+      predictedFor,
+    );
 
     res.json({
       success: true,
@@ -259,101 +266,116 @@ export async function searchSymbols(req, res) {
 }
 
 export async function addSymbol(req, res) {
-  const { symbol, coinId, name } = req.body
+  const { symbol, coinId, name } = req.body;
 
   if (!symbol || !coinId) {
-    return res.status(400).json({ success: false, error: 'symbol and coinId are required' })
+    return res
+      .status(400)
+      .json({ success: false, error: "symbol and coinId are required" });
   }
 
   try {
     // Check if already exists
     const { rows: existing } = await pool.query(
-      'SELECT symbol FROM symbols WHERE symbol = $1',
-      [symbol.toUpperCase()]
-    )
+      "SELECT symbol FROM symbols WHERE symbol = $1",
+      [symbol.toUpperCase()],
+    );
 
     if (existing.length > 0) {
-      return res.status(400).json({ success: false, error: `${symbol} already exists` })
+      return res
+        .status(400)
+        .json({ success: false, error: `${symbol} already exists` });
     }
 
     // Add to symbols table
     await pool.query(
       `INSERT INTO symbols (symbol, base_asset, quote_asset)
        VALUES ($1, $2, 'USDT')`,
-      [symbol.toUpperCase(), symbol.replace('USDT', '').toUpperCase()]
-    )
+      [symbol.toUpperCase(), symbol.replace("USDT", "").toUpperCase()],
+    );
 
     // Store coinId mapping
     await pool.query(
       `INSERT INTO coin_map (symbol, coin_id, name)
        VALUES ($1, $2, $3)
        ON CONFLICT (symbol) DO NOTHING`,
-      [symbol.toUpperCase(), coinId, name]
-    )
+      [symbol.toUpperCase(), coinId, name],
+    );
 
     // Fetch 2 years of history via yfinance
-    const { exec } = await import('child_process')
-    const { fileURLToPath } = await import('url')
-    const path = await import('path')
+    const { exec } = await import("child_process");
+    const { fileURLToPath } = await import("url");
+    const path = await import("path");
 
-    const __dirname = path.dirname(fileURLToPath(import.meta.url))
-    const FETCH_SCRIPT = path.join(__dirname, '../../../ml/fetch_data.py')
-    const PYTHON = path.join(__dirname, '../../../ml/venv/Scripts/python.exe')
+    const __dirname = path.dirname(fileURLToPath(import.meta.url));
+    const FETCH_SCRIPT = path.join(__dirname, "../../../ml/fetch_data.py");
+    const PYTHON = path.join(__dirname, "../../../ml/venv/Scripts/python.exe");
 
     await new Promise((resolve, reject) => {
       exec(
         `"${PYTHON}" "${FETCH_SCRIPT}" history ${symbol.toUpperCase()}`,
         (error, stdout, stderr) => {
           if (error) {
-            console.warn(`[addSymbol] yfinance fetch warning: ${stderr}`)
-            resolve() // Don't fail the whole request if fetch fails
+            console.warn(`[addSymbol] yfinance fetch warning: ${stderr}`);
+            resolve(); // Don't fail the whole request if fetch fails
           } else {
-            console.log(`[addSymbol] ${stdout}`)
-            resolve()
+            console.log(`[addSymbol] ${stdout}`);
+            resolve();
           }
-        }
-      )
-    })
+        },
+      );
+    });
 
     // Check how many candles we got
     const { rows: candles } = await pool.query(
-      'SELECT COUNT(*) FROM ohlcv WHERE symbol = $1',
-      [symbol.toUpperCase()]
-    )
+      "SELECT COUNT(*) FROM ohlcv WHERE symbol = $1",
+      [symbol.toUpperCase()],
+    );
 
-    const count = parseInt(candles[0].count)
+    const count = parseInt(candles[0].count);
 
     res.json({
       success: true,
       message: `${symbol} added with ${count} candles of historical data`,
-    })
+    });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message })
+    res.status(500).json({ success: false, error: err.message });
   }
 }
 
-
 export async function deleteSymbol(req, res) {
-  const { symbol } = req.params
+  const { symbol } = req.params;
 
-  const defaultSymbols = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT']
+  const defaultSymbols = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT"];
   if (defaultSymbols.includes(symbol.toUpperCase())) {
     return res.status(400).json({
       success: false,
       error: `${symbol} is a default symbol and cannot be deleted`,
-    })
+    });
   }
 
   try {
-    await pool.query('DELETE FROM watchlists WHERE symbol = $1', [symbol.toUpperCase()])
-    await pool.query('DELETE FROM predictions WHERE symbol = $1', [symbol.toUpperCase()])
-    await pool.query('DELETE FROM alerts WHERE symbol = $1', [symbol.toUpperCase()])
-    await pool.query('DELETE FROM ohlcv WHERE symbol = $1', [symbol.toUpperCase()])
-    await pool.query('DELETE FROM coin_map WHERE symbol = $1', [symbol.toUpperCase()])
-    await pool.query('DELETE FROM symbols WHERE symbol = $1', [symbol.toUpperCase()])
+    await pool.query("DELETE FROM watchlists WHERE symbol = $1", [
+      symbol.toUpperCase(),
+    ]);
+    await pool.query("DELETE FROM predictions WHERE symbol = $1", [
+      symbol.toUpperCase(),
+    ]);
+    await pool.query("DELETE FROM alerts WHERE symbol = $1", [
+      symbol.toUpperCase(),
+    ]);
+    await pool.query("DELETE FROM ohlcv WHERE symbol = $1", [
+      symbol.toUpperCase(),
+    ]);
+    await pool.query("DELETE FROM coin_map WHERE symbol = $1", [
+      symbol.toUpperCase(),
+    ]);
+    await pool.query("DELETE FROM symbols WHERE symbol = $1", [
+      symbol.toUpperCase(),
+    ]);
 
-    res.json({ success: true, message: `${symbol} deleted successfully` })
+    res.json({ success: true, message: `${symbol} deleted successfully` });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message })
+    res.status(500).json({ success: false, error: err.message });
   }
 }

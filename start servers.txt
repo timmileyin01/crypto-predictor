@@ -1,0 +1,16 @@
+Server
+
+npx nodemon src/index.js
+
+
+Model
+
+source venv/Scripts/activate
+uvicorn main:app --reload --port 8000
+
+client
+npm run dev
+
+
+
+curl -X POST http://localhost:5000/api/crypto/run-daily-job
