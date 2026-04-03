@@ -61,10 +61,10 @@ export async function getHistory(req, res) {
   try {
     const { rows } = await pool.query(
       `SELECT time, open, high, low, close, volume
-       FROM ohlcv
-       WHERE symbol = $1
-         AND time >= NOW() - ($2 || ' days')::interval
-       ORDER BY time ASC`,
+   FROM ohlcv
+   WHERE symbol = $1
+     AND time >= NOW() - ($2 || ' days')::interval
+   ORDER BY time ASC`,
       [symbol.toUpperCase(), days],
     );
     res.json({ success: true, symbol: symbol.toUpperCase(), data: rows });
@@ -209,24 +209,21 @@ export async function getPredictionHistory(req, res) {
   try {
     await pool.query(
       `UPDATE predictions p
-       SET actual_close = o.close
-       FROM (
-         SELECT DISTINCT ON (DATE(time)) DATE(time) AS day, close
-         FROM ohlcv WHERE symbol = $1
-         ORDER BY DATE(time), time DESC
-       ) o
-       WHERE p.symbol = $1
-         AND p.predicted_for = o.day
-         AND p.actual_close IS NULL`,
+   SET actual_close = o.close
+   FROM (
+     SELECT DISTINCT ON (DATE(time + interval '1 hour')) 
+       DATE(time + interval '1 hour') AS day, close
+     FROM ohlcv WHERE symbol = $1
+     ORDER BY DATE(time + interval '1 hour'), time DESC
+   ) o
+   WHERE p.symbol = $1
+     AND p.predicted_for = o.day
+     AND p.actual_close IS NULL`,
       [symbol.toUpperCase()],
     );
 
     const { rows } = await pool.query(
-      `SELECT 
-     TO_CHAR(predicted_for, 'YYYY-MM-DD') AS predicted_for,
-     predicted_close,
-     actual_close,
-     created_at
+      `SELECT predicted_for, predicted_close, actual_close, model_version, created_at
    FROM predictions
    WHERE symbol = $1
    ORDER BY predicted_for DESC

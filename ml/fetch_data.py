@@ -2,6 +2,7 @@ import yfinance as yf
 import psycopg2
 import os
 import sys
+import pandas as pd
 from dotenv import load_dotenv
 
 load_dotenv('../server/.env')
@@ -81,9 +82,9 @@ def fetch_and_store(symbol, yf_symbol, period='2y'):
                 INSERT INTO ohlcv (time, symbol, open, high, low, close, volume)
                 VALUES (%s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (time, symbol) DO UPDATE
-                  SET open=EXCLUDED.open, high=EXCLUDED.high,
-                      low=EXCLUDED.low, close=EXCLUDED.close,
-                      volume=EXCLUDED.volume
+                SET open=EXCLUDED.open, high=EXCLUDED.high,
+                    low=EXCLUDED.low, close=EXCLUDED.close,
+                    volume=EXCLUDED.volume
                 """,
                 (
                     date.to_pydatetime(),
@@ -98,6 +99,8 @@ def fetch_and_store(symbol, yf_symbol, period='2y'):
             count += 1
         except Exception as e:
             print(f'  Row error: {e}')
+
+
 
     conn.commit()
     cur.close()

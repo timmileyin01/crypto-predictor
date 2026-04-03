@@ -66,12 +66,25 @@ export async function sendAlertEmail({
     </div>
   `;
 
-  await transporter.sendMail({
-    from: `CryptoLSTM <${process.env.GMAIL_USER}>`,
-    to,
-    subject,
-    html,
-  });
+  const maxRetries = 3
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      await transporter.sendMail({
+        from: `CryptoLSTM <${process.env.GMAIL_USER}>`,
+        to,
+        subject,
+        html,
+      })
+      return // success — exit retry loop
+    } catch (err) {
+      if (i === maxRetries - 1) {
+        console.error(`[Mailer] Failed after ${maxRetries} attempts:`, err.message)
+      } else {
+        console.log(`[Mailer] Retry ${i + 1} in 3s...`)
+        await new Promise((r) => setTimeout(r, 3000))
+      }
+    }
+  }
 }
 
 export async function verifyMailer() {

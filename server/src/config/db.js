@@ -16,6 +16,11 @@ export const pool = new Pool({
   ssl: isProduction ? { rejectUnauthorized: false } : false,
 })
 
+// Force UTC timezone for all connections
+pool.on('connect', (client) => {
+  client.query("SET timezone='UTC'")
+})
+
 export async function initDB() {
   const client = await pool.connect()
   try {
